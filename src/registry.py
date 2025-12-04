@@ -2,10 +2,9 @@
 
 from typing import Optional, List
 from pathlib import Path
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
 from .config import config
 from .cache import tool_cache
+from .connection_manager import connection_manager
 
 # 工具文件存储目录
 TOOLS_DIR = Path(__file__).parent.parent / "tools"
@@ -15,58 +14,37 @@ TOOLS_DIR.mkdir(exist_ok=True)
 class ToolRegistry:
     """工具注册管理器 (MongoDB)"""
     
-    def __init__(self):
-        self._client: Optional[MongoClient] = None
-        self._db = None
-        self._collection = None
-        self._connected = False
-    
-    def _connect(self):
-        """连接 MongoDB"""
-        if self._client is None:
-            try:
-                self._client = MongoClient(
-                    config.MONGODB_URI, 
-                    serverSelectionTimeoutMS=2000
-                )
-                self._client.admin.command('ping')
-                self._db = self._client[config.MONGODB_DB]
-                self._collection = self._db[config.MONGODB_COLLECTION]
-                self._connected = True
-            except ConnectionFailure:
-                print("[WARN] MongoDB 连接失败，将使用内存存储")
-                self._connected = False
+    def _get_collection(self):
+        """获取集合（通过连接管理器）"""
+        return connection_manager.db.get_collection()
     
     def is_connected(self) -> bool:
         """检查连接状态"""
-        self._connect()
-        return self._connected
+        return connection_manager.db.is_connected()
     
     def list_tools(self) -> List[str]:
         """列出所有工具名称"""
-        self._connect()
-        if not self._connected:
+        collection = self._get_collection()
+        if collection is None:
             return []
         
         try:
-            return [doc["name"] for doc in self._collection.find({}, {"name": 1})]
+            return [doc["name"] for doc in collection.find({}, {"name": 1})]
         except Exception:
             return []
     
     def get_tool(self, name: str) -> Optional[dict]:
         """获取指定工具"""
-        # 先查缓存
         cached = tool_cache.get_tool(name)
         if cached:
             return cached
         
-        # 查数据库
-        self._connect()
-        if not self._connected:
+        collection = self._get_collection()
+        if collection is None:
             return None
         
         try:
-            doc = self._collection.find_one({"name": name})
+            doc = collection.find_one({"name": name})
             if doc:
                 doc.pop("_id", None)
                 tool_cache.set_tool(doc)
@@ -77,12 +55,12 @@ class ToolRegistry:
     
     def register(self, spec: dict) -> bool:
         """注册工具到数据库"""
-        self._connect()
-        if not self._connected:
+        collection = self._get_collection()
+        if collection is None:
             return False
         
         try:
-            self._collection.update_one(
+            collection.update_one(
                 {"name": spec["name"]},
                 {"$set": spec},
                 upsert=True
@@ -158,12 +136,12 @@ if __name__ == "__main__":
     
     def search_by_category(self, category: str) -> List[dict]:
         """按分类搜索工具"""
-        self._connect()
-        if not self._connected:
+        collection = self._get_collection()
+        if collection is None:
             return tool_cache.search_by_category(category)
         
         try:
-            docs = list(self._collection.find({"category": category}))
+            docs = list(collection.find({"category": category}))
             for doc in docs:
                 doc.pop("_id", None)
             return docs

@@ -1,7 +1,8 @@
-"""子图组装模块 - 支持多任务"""
+"""子图组装模块 - 支持多任务和会话持久化"""
 
 from langgraph.graph import StateGraph, START, END
 from .state import SelfToolState
+from .checkpointer import checkpointer
 from .nodes import (
     analyze_requirement_node,
     plan_tasks_node,
@@ -125,7 +126,7 @@ def create_self_tool_graph():
     builder.add_edge("reject", END)
     builder.add_edge("fail", END)
     
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
 # 导出图实例

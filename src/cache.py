@@ -4,38 +4,19 @@ import json
 from typing import Optional
 import redis
 from .config import config
+from .connection_manager import connection_manager
 
 
 class ToolCache:
     """工具缓存管理器 (Redis)"""
     
-    def __init__(self):
-        self._client: Optional[redis.Redis] = None
-        self._connected = False
-    
     def _get_client(self) -> Optional[redis.Redis]:
-        """获取 Redis 客户端"""
-        if self._client is None:
-            try:
-                self._client = redis.Redis(
-                    host=config.REDIS_HOST,
-                    port=config.REDIS_PORT,
-                    db=config.REDIS_DB,
-                    decode_responses=True,
-                    socket_timeout=2,
-                )
-                self._client.ping()
-                self._connected = True
-            except redis.ConnectionError:
-                print("[WARN] Redis 连接失败，将禁用缓存")
-                self._connected = False
-                self._client = None
-        return self._client
+        """获取 Redis 客户端（通过连接管理器）"""
+        return connection_manager.cache.get_client()
     
     def is_connected(self) -> bool:
         """检查连接状态"""
-        self._get_client()
-        return self._connected
+        return connection_manager.cache.is_connected()
     
     def get_tool(self, name: str) -> Optional[dict]:
         """从缓存获取工具"""

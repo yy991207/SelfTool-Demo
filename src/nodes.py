@@ -180,13 +180,26 @@ async def analyze_requirement_node(state: SelfToolState) -> dict:
     workflow_logger.info("节点1: 需求分析开始")
     workflow_logger.info(f"用户请求: {state['user_request']}")
     
+    # 构建历史对话上下文
+    history_context = ""
+    messages = state.get("messages", [])
+    if messages:
+        history_lines = []
+        for msg in messages[-10:]:  # 最近10条消息
+            role = "用户" if isinstance(msg, HumanMessage) else "助手"
+            history_lines.append(f"{role}: {msg.content}")
+        if history_lines:
+            history_context = "历史对话:\n" + "\n".join(history_lines) + "\n\n"
+    
     prompt = f"""分析以下用户请求，判断是否需要执行工具/代码来完成。
 
-用户请求: {state['user_request']}
+{history_context}当前请求: {state['user_request']}
 
 判断标准:
 - 需要工具: 获取时间、计算数学、生成随机数、处理数据等需要执行代码的任务
 - 不需要工具: 聊天问候、问答解释、意见咨询等可以直接回复的问题
+
+注意: 如果历史对话中有相关信息，请结合历史回答当前问题。
 
 返回 JSON 格式:
 {{
@@ -224,13 +237,19 @@ async def analyze_requirement_node(state: SelfToolState) -> dict:
     else:
         print(f"  需要工具: 否 (直接回复)")
     
+    # 构建消息历史：用户请求 + 助手回复
+    new_messages = [
+        HumanMessage(content=state['user_request']),
+        AIMessage(content=direct_answer if direct_answer else f"任务: {task_desc}")
+    ]
+    
     return {
         "need_tool": need_tool,
         "task_description": task_desc,
         "task_category": task_cat,
         "execution_result": direct_answer if not need_tool else None,
         "current_node": "analyze",
-        "messages": [AIMessage(content=f"任务分析完成: {task_desc}")]
+        "messages": new_messages
     }
 
 
