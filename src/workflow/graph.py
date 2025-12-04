@@ -16,6 +16,7 @@ from .nodes import (
     save_task_result_node,
     aggregate_results_node,
     format_response_node,
+    should_continue_node,
     reject_node,
     fail_node,
 )
@@ -25,6 +26,7 @@ from .routing import (
     route_after_safety,
     route_after_execute,
     route_after_save_result,
+    route_after_should_continue,
 )
 
 
@@ -46,6 +48,7 @@ def create_self_tool_graph():
     builder.add_node("save_result", save_task_result_node)
     builder.add_node("aggregate", aggregate_results_node)
     builder.add_node("format_response", format_response_node)
+    builder.add_node("should_continue", should_continue_node)
     builder.add_node("reject", reject_node)
     builder.add_node("fail", fail_node)
     
@@ -121,8 +124,20 @@ def create_self_tool_graph():
     # 汇总 -> 润色
     builder.add_edge("aggregate", "format_response")
     
+    # 润色 -> 迭代判断
+    builder.add_edge("format_response", "should_continue")
+    
+    # ===== 迭代循环 =====
+    builder.add_conditional_edges(
+        "should_continue",
+        route_after_should_continue,
+        {
+            "continue": "search",  # 继续执行 -> 直接检索工具
+            "end": END
+        }
+    )
+    
     # ===== 终点 =====
-    builder.add_edge("format_response", END)
     builder.add_edge("reject", END)
     builder.add_edge("fail", END)
     

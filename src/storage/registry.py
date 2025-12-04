@@ -148,31 +148,29 @@ if __name__ == "__main__":
         except Exception:
             return []
     
-    def semantic_search(self, query: str, category: str = None) -> Optional[dict]:
-        """语义搜索匹配工具 (简单关键词匹配)"""
-        query_lower = query.lower()
-        keywords = set(query_lower.split())
+    def get_tools_summary(self, category: str = None) -> str:
+        """获取工具摘要文本（供 LLM 判断）"""
+        if category:
+            tools = self.search_by_category(category)
+        else:
+            collection = self._get_collection()
+            tools = []
+            if collection:
+                try:
+                    docs = list(collection.find({}, {"name": 1, "description": 1, "category": 1}))
+                    for doc in docs:
+                        doc.pop("_id", None)
+                    tools = docs
+                except Exception:
+                    pass
         
-        # 时间相关关键词
-        time_keywords = {"时间", "几点", "time", "clock", "hour", "minute"}
-        date_keywords = {"日期", "date", "today", "日历", "calendar", "星期"}
-        math_keywords = {"计算", "math", "加", "减", "乘", "除", "求和"}
+        if not tools:
+            return ""
         
-        # 判断类别
-        detected_category = None
-        if keywords & time_keywords:
-            detected_category = "datetime"
-        elif keywords & date_keywords:
-            detected_category = "calendar"
-        elif keywords & math_keywords:
-            detected_category = "math"
-        
-        if detected_category:
-            tools = self.search_by_category(detected_category)
-            if tools:
-                return tools[0]
-        
-        return None
+        return "\n".join([
+            f"- {t['name']}: {t.get('description', '无描述')}"
+            for t in tools
+        ])
 
 
 # 全局注册实例

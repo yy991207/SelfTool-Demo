@@ -45,3 +45,21 @@ def route_after_save_result(state: SelfToolState) -> Literal["next_task", "aggre
     if current < total:
         return "next_task"
     return "aggregate"
+
+
+def route_after_should_continue(state: SelfToolState) -> Literal["continue", "end"]:
+    """迭代判断后路由: 是否继续执行"""
+    iteration = state.get("iteration_count", 0)
+    max_iter = state.get("max_iterations", 5)
+    reasoning = state.get("continue_reasoning", "")
+    
+    # 达到最大迭代次数
+    if iteration >= max_iter:
+        return "end"
+    
+    # 检查 [DONE] 标记（由 should_continue_node 设置）
+    if reasoning.startswith("[DONE]"):
+        return "end"
+    
+    # 未完成，继续执行
+    return "continue"

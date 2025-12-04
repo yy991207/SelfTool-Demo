@@ -59,6 +59,11 @@ class SelfToolState(TypedDict):
     # 流程控制
     current_node: str
     error: Optional[str]
+    
+    # 迭代控制 (多次工具调用)
+    iteration_count: int              # 当前迭代次数
+    max_iterations: int               # 最大迭代次数
+    continue_reasoning: Optional[str] # LLM判断是否继续的理由
 
 
 def create_initial_state(user_request: str) -> SelfToolState:
@@ -88,4 +93,7 @@ def create_initial_state(user_request: str) -> SelfToolState:
         "messages": [],
         "current_node": "start",
         "error": None,
+        "iteration_count": 0,
+        "max_iterations": 5,
+        "continue_reasoning": None,
     }

@@ -254,41 +254,87 @@ async def analyze_requirement_node(state: SelfToolState) -> dict:
 
 
 async def search_tool_node(state: SelfToolState) -> dict:
-    """节点2: 工具检索"""
+    """节点2: 工具检索 - LLM 智能判断可用工具"""
     print("\n[2/6] 工具检索...")
     workflow_logger.info("=" * 60)
     workflow_logger.info("节点2: 工具检索开始")
     
     existing = tool_registry.list_tools()
     registry_logger.info(f"已注册工具列表: {existing}")
-    
     registry_logger.info(f"搜索查询: {state['task_description']}")
     registry_logger.info(f"搜索分类: {state['task_category']}")
     
-    matched = tool_registry.semantic_search(
-        state["task_description"], 
-        state["task_category"]
-    )
+    # 获取同类别工具列表
+    category_tools = tool_registry.search_by_category(state['task_category'])
     
-    if matched:
-        registry_logger.info(f"匹配成功! 工具: {matched['name']}")
-        registry_logger.debug(f"匹配工具详情: {json.dumps(matched, ensure_ascii=False, indent=2)}")
-        print(f"  找到匹配工具: {matched['name']}")
-        return {
-            "existing_tools": existing,
-            "matched_tool": matched,
-            "need_generate": False,
-            "current_node": "search",
-        }
-    else:
-        registry_logger.info("未找到匹配工具，需要生成新工具")
-        print("  未找到匹配工具，准备生成")
+    if not category_tools:
+        registry_logger.info("无同类别工具，需要生成新工具")
+        print("  无可用工具，准备生成")
         return {
             "existing_tools": existing,
             "matched_tool": None,
             "need_generate": True,
             "current_node": "search",
         }
+    
+    # 构建工具列表描述
+    tools_summary = tool_registry.get_tools_summary(state['task_category'])
+    
+    # LLM 判断是否有可复用的工具
+    prompt = f"""判断已有工具是否可以完成当前任务。
+
+当前任务: {state['task_description']}
+
+可用工具列表:
+{tools_summary}
+
+请判断:
+1. 上述工具中是否有可以完成当前任务的？
+2. 如果有，选择最合适的工具
+3. 如果没有合适的工具，需要生成新工具
+
+返回 JSON:
+{{
+    "use_existing": true或false,
+    "tool_name": "选中的工具名，无则留空",
+    "reason": "选择理由"
+}}
+
+只返回 JSON。"""
+
+    llm_logger.info("发送工具选择 Prompt 到 LLM")
+    llm_logger.debug(f"Prompt 内容:\n{prompt}")
+    
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    result = _extract_json(response.content)
+    
+    use_existing = result.get("use_existing", False)
+    tool_name = result.get("tool_name", "")
+    reason = result.get("reason", "")
+    
+    registry_logger.info(f"LLM 判断: use_existing={use_existing}, tool={tool_name}, reason={reason}")
+    
+    if use_existing and tool_name:
+        # 查找匹配的工具
+        matched = next((t for t in category_tools if t['name'] == tool_name), None)
+        if matched:
+            registry_logger.info(f"匹配成功! 工具: {matched['name']}")
+            print(f"  LLM 选择工具: {matched['name']} ({reason})")
+            return {
+                "existing_tools": existing,
+                "matched_tool": matched,
+                "need_generate": False,
+                "current_node": "search",
+            }
+    
+    registry_logger.info(f"LLM 判断需要生成新工具: {reason}")
+    print(f"  LLM 判断需要新工具 ({reason})")
+    return {
+        "existing_tools": existing,
+        "matched_tool": None,
+        "need_generate": True,
+        "current_node": "search",
+    }
 
 
 async def generate_code_node(state: SelfToolState) -> dict:
@@ -606,6 +652,82 @@ async def format_response_node(state: SelfToolState) -> dict:
     return {
         "execution_result": formatted,
         "current_node": "format_response"
+    }
+
+
+async def should_continue_node(state: SelfToolState) -> dict:
+    """判断是否需要继续执行工具"""
+    iteration = state.get("iteration_count", 0) + 1
+    max_iter = state.get("max_iterations", 5)
+    
+    print(f"\n[迭代判断] 第 {iteration} 次迭代...")
+    workflow_logger.info("=" * 60)
+    workflow_logger.info(f"迭代判断节点: 第 {iteration}/{max_iter} 次")
+    
+    # 达到最大迭代次数，强制结束
+    if iteration >= max_iter:
+        print(f"  达到最大迭代次数 ({max_iter})，结束执行")
+        return {
+            "iteration_count": iteration,
+            "continue_reasoning": "达到最大迭代次数",
+            "current_node": "should_continue"
+        }
+    
+    user_request = state.get("user_request", "")
+    current_result = state.get("execution_result", "")
+    task_results = state.get("task_results", [])
+    
+    # 构建历史结果
+    history = "\n".join([
+        f"- {r.get('description', '')}: {r.get('result', '')}"
+        for r in task_results
+    ]) if task_results else "无"
+    
+    prompt = f"""判断当前任务是否已完成。
+
+用户原始请求: {user_request}
+已执行的步骤和结果:
+{history}
+当前结果: {current_result}
+
+请判断:
+1. 用户的请求是否已经完全满足？
+2. 是否还需要执行更多步骤？
+
+返回 JSON:
+{{
+    "is_complete": true或false,
+    "reasoning": "判断理由",
+    "next_task": "如果未完成，下一步需要做什么（留空表示已完成）"
+}}
+
+只返回 JSON。"""
+
+    llm_logger.info("发送迭代判断 Prompt 到 LLM")
+    llm_logger.debug(f"Prompt 内容:\n{prompt}")
+    
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    result = _extract_json(response.content)
+    
+    is_complete = result.get("is_complete", True)
+    reasoning = result.get("reasoning", "")
+    next_task = result.get("next_task", "")
+    
+    workflow_logger.info(f"判断结果: {'已完成' if is_complete else '需继续'}")
+    workflow_logger.info(f"理由: {reasoning}")
+    
+    if is_complete:
+        print(f"  任务已完成: {reasoning}")
+        # 在 reasoning 前加标记，供路由函数判断
+        reasoning = "[DONE] " + reasoning
+    else:
+        print(f"  需要继续: {next_task}")
+    
+    return {
+        "iteration_count": iteration,
+        "continue_reasoning": reasoning,
+        "task_description": next_task if not is_complete else state.get("task_description", ""),
+        "current_node": "should_continue"
     }
 
 

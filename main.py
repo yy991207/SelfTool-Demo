@@ -50,10 +50,20 @@ async def run_demo(user_request: str, thread_id: str = None):
     print("-" * 50)
     
     # 只传入当前请求，checkpoint 会自动恢复历史状态
-    input_state = {"user_request": user_request}
+    # 重置迭代计数和任务列表（每个新请求都是新的执行）
+    input_state = {
+        "user_request": user_request,
+        "iteration_count": 0,
+        "task_list": [],
+        "task_results": [],
+        "current_task_index": 0,
+    }
     
     # 运行图（带会话配置）
-    config = {"configurable": {"thread_id": thread_id}} if thread_id else None
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": 100  # 增加递归限制，支持多任务多迭代
+    } if thread_id else {"recursion_limit": 100}
     result = await self_tool_graph.ainvoke(input_state, config=config)
     
     # 输出结果
