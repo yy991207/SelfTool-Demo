@@ -1,0 +1,16 @@
+# LangGraph
+langgraph==0.2.60
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+
+# Database
+pymongo>=4.6.0
+redis>=5.0.0
+
+# Utils
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
