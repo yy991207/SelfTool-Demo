@@ -3,8 +3,8 @@
 import json
 from typing import Optional
 import redis
-from .config import config
-from .connection_manager import connection_manager
+from ..infra.config import config
+from ..infra.connection_manager import connection_manager
 
 
 class ToolCache:

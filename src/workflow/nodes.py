@@ -4,13 +4,13 @@ import json
 import time
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from .config import config
+from ..infra.config import config
 from .state import SelfToolState, ToolSpec
-from .safety import CodeSafetyChecker
-from .sandbox import SafeExecutor
-from .registry import tool_registry
-from .cache import tool_cache
-from .logger import llm_logger, sandbox_logger, safety_logger, registry_logger, workflow_logger
+from ..execution.safety import CodeSafetyChecker
+from ..execution.sandbox import SafeExecutor
+from ..storage.registry import tool_registry
+from ..storage.cache import tool_cache
+from ..infra.logger import llm_logger, sandbox_logger, safety_logger, registry_logger, workflow_logger
 
 
 # 初始化 LLM 客户端 (阿里云 DashScope)

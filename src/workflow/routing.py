@@ -2,7 +2,7 @@
 
 from typing import Literal
 from .state import SelfToolState
-from .config import config
+from ..infra.config import config
 
 
 def route_after_analyze(state: SelfToolState) -> Literal["need_tool", "direct_answer"]:

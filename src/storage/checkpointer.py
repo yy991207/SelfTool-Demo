@@ -8,7 +8,7 @@ from typing import Any, Optional, Iterator, Tuple
 CHINA_TZ = timezone(timedelta(hours=8))
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointMetadata, CheckpointTuple
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
-from .connection_manager import connection_manager
+from ..infra.connection_manager import connection_manager
 
 
 class MongoDBCheckpointer(BaseCheckpointSaver):

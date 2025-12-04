@@ -2,12 +2,12 @@
 
 from typing import Optional, List
 from pathlib import Path
-from .config import config
+from ..infra.config import config
 from .cache import tool_cache
-from .connection_manager import connection_manager
+from ..infra.connection_manager import connection_manager
 
-# 工具文件存储目录
-TOOLS_DIR = Path(__file__).parent.parent / "tools"
+# 工具文件存储目录 (项目根目录/tools)
+TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
 TOOLS_DIR.mkdir(exist_ok=True)
 
 

@@ -2,7 +2,7 @@
 
 from langgraph.graph import StateGraph, START, END
 from .state import SelfToolState
-from .checkpointer import checkpointer
+from ..storage.checkpointer import checkpointer
 from .nodes import (
     analyze_requirement_node,
     plan_tasks_node,

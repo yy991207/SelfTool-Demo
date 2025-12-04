@@ -3,11 +3,9 @@
 import asyncio
 import atexit
 import uuid
-from src.graph import self_tool_graph
-from src.state import create_initial_state
-from src.connection_manager import connection_manager
-from src.registry import tool_registry, TOOLS_DIR
-from src.checkpointer import checkpointer
+from src.workflow import self_tool_graph, create_initial_state
+from src.infra import connection_manager
+from src.storage import tool_registry, TOOLS_DIR, checkpointer
 
 
 # 全局会话 ID
